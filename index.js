@@ -5,28 +5,31 @@ import {
   NativeModules,
   StyleSheet,
   View,
-  TouchableOpacity,
   Image,
   PanResponder,
   Platform,
 } from "react-native";
 import { RNCamera } from "react-native-camera";
-import Svg, { Polygon } from "react-native-svg";
+import Svg, { Polygon, Defs, Path, Use, G  } from "react-native-svg";
 
 // Native modules
-const { RNDocumentScanner } = NativeModules;
+const { RNDocumentScanner } = NativeModules
 
 class DocumentScanner extends Component {
   static propTypes = {
     onStartCapture: PropTypes.func,
     onEndCapture: PropTypes.func,
     RNCameraProps: PropTypes.object,
+    renderRectangle: PropTypes.bool,
+    color: PropTypes.string
   };
 
   static defaultProps = {
     onStartCapture: () => {},
     onEndCapture: () => {},
     RNCameraProps: {},
+    renderRectangle: false,
+    color: 'blue'
   };
 
   constructor(props) {
@@ -70,6 +73,14 @@ class DocumentScanner extends Component {
 
     return RNDocumentScanner.crop(this.state.points, finalOptions);
   };
+
+  detectCorners = async (uri, layout) => {
+    return await RNDocumentScanner.detectEdges(
+      uri.replace("file://", ""),
+      layout
+    ); 
+  };
+
 
   /**
    * When layout changed
@@ -215,38 +226,50 @@ class DocumentScanner extends Component {
     });
   };
 
-  /**
-   * When capture button is clicked
-   * @param camera
-   */
-  _handlePressCapture = async (camera) => {
-    const { layout } = this.state;
-
-    // callback from props
-    this.props.onStartCapture();
-
-    // capture photo
+  takePhoto = async () => {
     const options = {
       base64: false,
       fixOrientation: true,
       pauseAfterCapture: true,
       orientation: "portrait",
     };
-    const { uri } = await camera.takePictureAsync(options);
+    const { uri } = await this.camera.takePictureAsync(options);
+    return uri
+  }
 
-    // attempt to identify document from opencv
-    const points = await RNDocumentScanner.detectEdges(
-      uri.replace("file://", ""),
-      layout
-    );
-
-    // update state
-    this.setState({ photo: uri, points }, () => {
+  /**
+   * When capture button is clicked
+   */
+  _handlePressCapture = async () => {
+    if(this.camera){
+      const { layout } = this.state;
       // callback from props
-      this.props.onEndCapture();
-    });
+      this.props.onStartCapture();
+  
+      // capture photo
+      const options = {
+        base64: false,
+        fixOrientation: true,
+        pauseAfterCapture: true,
+        orientation: "portrait",
+      };
+      const { uri } = await this.camera.takePictureAsync(options);
+  
+      // attempt to identify document from opencv
+      const points = await RNDocumentScanner.detectEdges(
+        uri.replace("file://", ""),
+        layout
+      );   
+      // update state
+      this.setState({ photo: uri, points }, () => {
+        // callback from props
+        this.props.onEndCapture();
+      });
+    }
   };
 
+
+  
   render() {
     const { RNCameraProps } = this.props;
     const { photo, points, zoomOnPoint } = this.state;
@@ -254,28 +277,57 @@ class DocumentScanner extends Component {
       width: containerWidth,
       height: containerHeight,
     } = this.state.layout;
-
+    
+    const rectHeight = 1.4 * ( containerWidth - 120)
+    const rectStart = (containerHeight - rectHeight) / 2
+    const showRectangle = this.props.renderRectangle
     return (
       <View style={styles.container} onLayout={this._handleLayout}>
         {/* Camera */}
         {photo === null && (
           <RNCamera
+            ref={ref => {
+              this.camera = ref;
+            }}
             style={styles.camera}
             type={RNCamera.Constants.Type.back}
-            captureAudio={false}
+            captureAudio={false}          
             {...RNCameraProps}
-          >
-            {({ camera }) => {
-              // Capture button
-              return (
-                <TouchableOpacity
-                  activeOpacity={0.6}
-                  onPress={() => this._handlePressCapture(camera)}
-                  style={styles.captureBtn}
-                />
-              );
-            }}
-          </RNCamera>
+        >
+          <Svg>
+            <Defs>
+              <G id="rectangle">
+                {rectStart ? <Path
+                    d={"M60 " + Number(rectStart) + " L60 " + Number(rectStart - 10) + " a5,5 0 0,1 5,-5 L75 " + Number(rectStart - 15)}
+                    fill="none"
+                    stroke={this.props.color}
+                    strokeWidth="1"
+                  /> : null}
+                { containerWidth && rectStart ? <Path
+                  d={"M"+ Number(containerWidth - 75)+ " " + Number(rectStart - 15) + " L"+Number(containerWidth - 65)+ " " + Number(rectStart - 15) + " a5,5 0 0,1 5,5 L"+Number(containerWidth - 60)+" " + Number(rectStart)}
+                  fill="none"
+                  stroke={this.props.color}
+                  strokeWidth="1"
+                /> : null}
+                { rectHeight ? <Path
+                  d={"M 75 "+ Number(rectHeight + rectStart)+" L65 "+Number(rectHeight + rectStart)+"a5,5 0 0,1 -5,-5 L60 " + Number(rectHeight + rectStart -15)}
+                  fill="none"
+                  stroke={this.props.color}
+                  strokeWidth="1"
+                /> : null}      
+                { rectHeight ? <Path
+                  d={"M"+Number(containerWidth - 60)+ " " + Number(rectStart + rectHeight -15 )+" L " + Number(containerWidth - 60) + " "+Number(rectStart + rectHeight -5)+"a5,5 0 0,1 -5,5 L "+ Number(containerWidth - 75) + " "+ Number(rectStart + rectHeight)}
+                  fill="none"
+                  stroke={this.props.color}
+                  strokeWidth="1"
+                /> : null}
+              </G>      
+            </Defs>
+              {
+                showRectangle ? <Use href="#rectangle"/> : null
+              }
+            </Svg>
+        </RNCamera>
         )}
 
         {/* Photo */}
@@ -380,13 +432,14 @@ const styles = StyleSheet.create({
   captureBtn: {
     alignSelf: "center",
     position: "absolute",
-    bottom: 40,
+    bottom: 20,
     width: 60,
     height: 60,
-    borderRadius: 30,
-    backgroundColor: "white",
-    borderWidth: 5,
-    borderColor: "#c2c2c2",
+    backgroundColor: 'powderblue',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 35,
+    zIndex: 999
   },
   imageCropperPointContainer: {
     alignItems: "center",
