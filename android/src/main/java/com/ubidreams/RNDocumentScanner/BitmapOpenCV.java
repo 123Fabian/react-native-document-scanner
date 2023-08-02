@@ -86,16 +86,16 @@ public class BitmapOpenCV {
     }
 
     public List<PointF> detectEdges() {
-        float defaultWidth = (float) (this.frameSize.width * 0.5);
-        float defaultHeight = defaultWidth;
-        float defaultX = (float) (this.frameSize.width - defaultWidth) / 2;
-        float defaultY = (float) (this.frameSize.height - defaultHeight) / 2;
+
+        float rectHeight = (float) ( 1.4 * (this.frameSize.width - 120));
+        float rectStart = (float) ((this.frameSize.height - rectHeight) / 2);
 
         List<PointF> defaultResult = new ArrayList<>();
-        defaultResult.add(new PointF(defaultX, defaultY));
-        defaultResult.add(new PointF(defaultX + defaultWidth, defaultY));
-        defaultResult.add(new PointF(defaultX + defaultWidth, defaultY + defaultHeight));
-        defaultResult.add(new PointF(defaultX, defaultY + defaultHeight));
+
+        defaultResult.add(new PointF(60, rectStart));
+        defaultResult.add(new PointF((float) (this.frameSize.width - 60), rectStart));
+        defaultResult.add(new PointF((float) (this.frameSize.width - 60), rectHeight + rectStart));
+        defaultResult.add(new PointF(60, rectHeight + rectStart));
 
         if (this.originalBitmap != null) {
             Mat image = new Mat();
