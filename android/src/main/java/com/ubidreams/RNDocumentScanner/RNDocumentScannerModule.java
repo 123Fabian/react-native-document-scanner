@@ -30,7 +30,7 @@ public class RNDocumentScannerModule extends ReactContextBaseJavaModule {
     private BitmapOpenCV bitmap;
 
     static {
-        System.loadLibrary("opencv_java3");
+        System.loadLibrary("opencv_java4");
     }
 
     public RNDocumentScannerModule(final ReactApplicationContext reactContext) {
